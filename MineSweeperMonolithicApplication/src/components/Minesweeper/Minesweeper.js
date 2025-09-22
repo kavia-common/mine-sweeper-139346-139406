@@ -236,6 +236,13 @@ export default function Minesweeper() {
   const [statusMessage, setStatusMessage] = useState("Start a new game and make your first move!");
   const [keyboardMode, setKeyboardMode] = useState(false); // toggled when using keyboard
   const [focusPos, setFocusPos] = useState([0, 0]); // row, col for keyboard navigation
+  const [muted, setMuted] = useState(false); // audio mute toggle
+
+  // Audio refs (HTML5 audio; assets in public)
+  const revealAudioRef = useRef(null);
+  const flagAudioRef = useRef(null);
+  const winAudioRef = useRef(null);
+  const loseAudioRef = useRef(null);
 
   const coveredSafeCells = useMemo(
     () => rows * cols - mines,
@@ -291,6 +298,18 @@ export default function Minesweeper() {
   /**
    * Check for win condition
    */
+  const playSound = useCallback((ref) => {
+    try {
+      if (muted || !ref?.current) return;
+      // Clone to allow overlapping playback without cutting off
+      const node = ref.current.cloneNode(true);
+      node.volume = ref.current.volume;
+      node.play().catch(() => {});
+    } catch (_e) {
+      /* ignore playback issues (e.g., autoplay policies) */
+    }
+  }, [muted]);
+
   const evaluateWin = useCallback(
     (nextBoard) => {
       const revealedSafe = countRevealedSafe(nextBoard);
@@ -299,17 +318,39 @@ export default function Minesweeper() {
         setGameOver(true);
         setWon(true);
         setStatusMessage(`You win! Time: ${seconds}s. Press Restart to play again.`);
+        playSound(winAudioRef);
         // Optional: call future high score submit hook here.
         return true;
       }
       return false;
     },
-    [coveredSafeCells, seconds]
+    [coveredSafeCells, seconds, playSound]
   );
 
   /**
    * Reveal a cell (left click / Enter)
    */
+  // transient animation tracker: map of "r-c" to { reveal: bool, flag: bool }
+  const [animMap, setAnimMap] = useState({});
+
+  const markAnim = useCallback((key, type) => {
+    setAnimMap((prev) => {
+      const next = { ...prev, [key]: { ...(prev[key] || {}), [type]: true } };
+      return next;
+    });
+    // clear after short duration to avoid class buildup
+    setTimeout(() => {
+      setAnimMap((prev) => {
+        const cur = { ...(prev[key] || {}) };
+        delete cur[type];
+        const rest = { ...prev };
+        if (Object.keys(cur).length === 0) delete rest[key];
+        else rest[key] = cur;
+        return rest;
+      });
+    }, 220);
+  }, []);
+
   const revealCell = useCallback(
     (r, c) => {
       if (gameOver) return;
@@ -326,6 +367,7 @@ export default function Minesweeper() {
         setGameOver(true);
         setWon(false);
         setStatusMessage("Boom! You hit a mine. Press Restart to try again.");
+        playSound(loseAudioRef);
         return;
       }
 
@@ -336,9 +378,11 @@ export default function Minesweeper() {
       }
 
       setBoard(next);
+      playSound(revealAudioRef);
+      markAnim(`${r}-${c}`, 'reveal');
       evaluateWin(next);
     },
-    [ensureMinesLaid, gameOver, evaluateWin]
+    [ensureMinesLaid, gameOver, evaluateWin, playSound, markAnim]
   );
 
   /**
@@ -353,8 +397,12 @@ export default function Minesweeper() {
       cell.isFlagged = !cell.isFlagged;
       setBoard(next);
       setStatusMessage(cell.isFlagged ? "Flag placed." : "Flag removed.");
+      playSound(flagAudioRef);
+      if (cell.isFlagged) {
+        markAnim(`${r}-${c}`, 'flag');
+      }
     },
-    [board, gameOver]
+    [board, gameOver, playSound, markAnim]
   );
 
   /**
@@ -502,6 +550,15 @@ export default function Minesweeper() {
             Help
           </button>
           <button
+            type="button"
+            className={`ms-audio-toggle ${muted ? 'muted' : ''}`}
+            onClick={() => setMuted((m) => !m)}
+            aria-pressed={!muted}
+            aria-label={muted ? "Unmute game sounds" : "Mute game sounds"}
+          >
+            {muted ? '🔇 Muted' : '🔊 Sound'}
+          </button>
+          <button
             className="ms-btn ms-warning"
             onClick={newGame}
             aria-label="Restart current game"
@@ -545,6 +602,7 @@ export default function Minesweeper() {
           onReveal={revealCell}
           onFlag={toggleFlag}
           setFocusPos={setFocusPos}
+          animMap={animMap}
         />
         {gameOver && (
           <div className="ms-overlay" role="alert" aria-live="assertive" aria-atomic="true">
@@ -572,6 +630,12 @@ export default function Minesweeper() {
           Tip: Use arrow keys to move, Enter to reveal, and Space to flag. Right click also flags.
         </small>
       </footer>
+
+      {/* Hidden audio elements for SFX; aria-hidden to avoid SR verbosity */}
+      <audio ref={revealAudioRef} src="/assets/audio/reveal.wav" preload="auto" aria-hidden="true" />
+      <audio ref={flagAudioRef} src="/assets/audio/flag.wav" preload="auto" aria-hidden="true" />
+      <audio ref={winAudioRef} src="/assets/audio/win.wav" preload="auto" aria-hidden="true" />
+      <audio ref={loseAudioRef} src="/assets/audio/lose.wav" preload="auto" aria-hidden="true" />
     </div>
   );
 }
@@ -579,7 +643,7 @@ export default function Minesweeper() {
 /**
  * Board component renders grid and handles mouse interactions
  */
-function Board({ board, gameOver, focusPos, keyboardMode, onReveal, onFlag, setFocusPos }) {
+function Board({ board, gameOver, focusPos, keyboardMode, onReveal, onFlag, setFocusPos, animMap }) {
   const rows = board.length;
   const cols = board[0]?.length || 0;
 
@@ -608,6 +672,7 @@ function Board({ board, gameOver, focusPos, keyboardMode, onReveal, onFlag, setF
               onClick={() => onReveal(rIdx, cIdx)}
               onContextMenu={(e) => handleContext(e, rIdx, cIdx)}
               onMouseEnter={() => setFocusPos([rIdx, cIdx])}
+              anim={animMap[`${rIdx}-${cIdx}`] || {}}
             />
           );
         })
@@ -619,7 +684,7 @@ function Board({ board, gameOver, focusPos, keyboardMode, onReveal, onFlag, setF
 /**
  * Single Cell component
  */
-function Cell({ cell, focused, gameOver, onClick, onContextMenu, onMouseEnter }) {
+function Cell({ cell, focused, gameOver, onClick, onContextMenu, onMouseEnter, anim }) {
   const { isRevealed, isFlagged, isMine, adjacent } = cell;
 
   let display = "";
@@ -633,11 +698,14 @@ function Cell({ cell, focused, gameOver, onClick, onContextMenu, onMouseEnter })
     if (isFlagged) display = "🚩";
   }
   const colorClass = isRevealed && !isMine && adjacent > 0 ? `c${adjacent}` : "";
+  const animClass =
+    (anim?.reveal ? " ms-anim-reveal" : "") +
+    (anim?.flag ? " ms-anim-flag" : "");
 
   return (
     <button
       type="button"
-      className={`${className} ${colorClass} ${focused ? "focused" : ""}`}
+      className={`${className} ${colorClass} ${focused ? "focused" : ""}${animClass}`}
       onClick={onClick}
       onContextMenu={onContextMenu}
       onMouseEnter={onMouseEnter}
@@ -645,7 +713,7 @@ function Cell({ cell, focused, gameOver, onClick, onContextMenu, onMouseEnter })
       aria-pressed={isRevealed}
       role="gridcell"
       tabIndex={-1}
-      disabled={isRevealed && !isMine ? false : false}
+      disabled={false}
     >
       {display}
     </button>
