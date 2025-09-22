@@ -1,13 +1,17 @@
-# Lightweight React Template for KAVIA
+# Lightweight React Template for KAVIA + Minesweeper
 
-This project provides a minimal React template with a clean, modern UI and minimal dependencies.
+This project now includes a fully functional, accessible Minesweeper game.
 
-## Features
+## Minesweeper Overview
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
+- Grid generation with randomized mines (first click is always safe)
+- Left click/Enter to reveal, Right click/Space/F to flag
+- Recursive reveal of empty cells
+- Win/Loss detection, end-game overlay, and timer
+- Difficulty presets and custom configuration
+- WCAG 2.1 AA-aligned keyboard navigation and screen reader support
+- Responsive, mobile-friendly layout
+- Optional backend integration stubs for future high score tracking
 
 ## Getting Started
 
@@ -27,56 +31,20 @@ Launches the test runner in interactive watch mode.
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
-## Customization
+## Optional Backend Integration
 
-### Colors
+A stub is provided at `src/utils/highScores.js` with public interfaces to submit and fetch scores in the future. Create a `.env` from `.env.example` and set `REACT_APP_API_BASE` when you enable the backend.
 
-The main brand colors are defined as CSS variables in `src/App.css`:
+## Accessibility
 
-```css
-:root {
-  --kavia-orange: #E87A41;
-  --kavia-dark: #1A1A1A;
-  --text-color: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-}
-```
+- The board is a keyboard-focusable region with arrow-key navigation.
+- Cells have descriptive aria-labels.
+- Live regions announce status updates and end-game messages.
+- Focus outlines and color choices meet contrast guidelines.
 
-### Components
+## Directory
 
-This template uses pure HTML/CSS components instead of a UI framework. You can find component styles in `src/App.css`. 
+- `src/components/Minesweeper/` – main game component and styles.
+- `src/utils/highScores.js` – optional high scores stub.
 
-Common components include:
-- Buttons (`.btn`, `.btn-large`)
-- Container (`.container`)
-- Navigation (`.navbar`)
-- Typography (`.title`, `.subtitle`, `.description`)
-
-## Learn More
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For React documentation see https://reactjs.org/.
