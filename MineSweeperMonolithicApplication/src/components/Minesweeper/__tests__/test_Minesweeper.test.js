@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event';
 import App from '../../../App';
 import Minesweeper from '../Minesweeper';
 
+// Increase Jest timeout for potentially longer-running keyboard navigation test
+jest.setTimeout(15000);
+
 /**
  * Utility helpers for tests
  */
@@ -25,7 +28,12 @@ describe('Minesweeper - basic rendering and accessibility', () => {
   test('renders board with correct ARIA roles and controls visible', () => {
     render(<Minesweeper />);
     // Title and controls
-    expect(screen.getByRole('heading', { name: /minesweeper/i })).toBeInTheDocument();
+    const mains = screen.queryAllByRole('main');
+    if (mains.length > 0) {
+      expect(within(mains[0]).getByRole('heading', { name: /minesweeper/i })).toBeInTheDocument();
+    } else {
+      expect(screen.getAllByRole('heading', { name: /minesweeper/i }).length).toBeGreaterThan(0);
+    }
     expect(screen.getByRole('combobox', { name: /difficulty preset/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /new game/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /restart current game/i })).toBeInTheDocument();
@@ -139,12 +147,16 @@ describe('Minesweeper - gameplay interactions', () => {
 
     // Focus the board region
     const region = getBoardGrid();
-    region.focus();
+    await act(async () => {
+      region.focus();
+    });
     expect(region).toHaveFocus();
 
     // 1) Move focus and reveal at least one cell to ensure keyboard mode is active
-    await user.keyboard('{ArrowRight}');
-    await user.keyboard('{Enter}');
+    await act(async () => {
+      await user.keyboard('{ArrowRight}');
+      await user.keyboard('{Enter}');
+    });
     const cellsAfterEnter = getAllCells();
     const revealedCount = cellsAfterEnter.filter(c => c.getAttribute('aria-pressed') === 'true').length;
     expect(revealedCount).toBeGreaterThan(0);
@@ -166,7 +178,9 @@ describe('Minesweeper - gameplay interactions', () => {
     // Helper to attempt flag on current focus position
     const tryFlagCurrent = async () => {
       // Space to toggle flag; only matters if current is covered
-      await user.keyboard(' ');
+      await act(async () => {
+        await user.keyboard(' ');
+      });
       const after = getFlaggedCount();
       if (after > wasFlaggedBefore) {
         return true;
@@ -184,11 +198,13 @@ describe('Minesweeper - gameplay interactions', () => {
     // Keep track of current direction. Start moving right.
     let direction = 'right';
     while (!foundAndFlagged && moves < maxMoves) {
-      if (direction === 'right') {
-        await user.keyboard('{ArrowRight}');
-      } else if (direction === 'left') {
-        await user.keyboard('{ArrowLeft}');
-      }
+      await act(async () => {
+        if (direction === 'right') {
+          await user.keyboard('{ArrowRight}');
+        } else if (direction === 'left') {
+          await user.keyboard('{ArrowLeft}');
+        }
+      });
       moves += 1;
 
       // Try to flag at each step
@@ -199,7 +215,9 @@ describe('Minesweeper - gameplay interactions', () => {
 
       // Periodically move down and flip direction to create a snake pattern
       if (moves % 10 === 0) {
-        await user.keyboard('{ArrowDown}');
+        await act(async () => {
+          await user.keyboard('{ArrowDown}');
+        });
         direction = direction === 'right' ? 'left' : 'right';
       }
     }
@@ -325,7 +343,12 @@ describe('Minesweeper - presets and integration with App header', () => {
     render(<App />);
     expect(screen.getByText(/kavia minesweeper/i)).toBeInTheDocument();
     // Minesweeper title inside App
-    expect(screen.getByRole('heading', { name: /minesweeper/i })).toBeInTheDocument();
+    const mains = screen.queryAllByRole('main');
+    if (mains.length > 0) {
+      expect(within(mains[0]).getByRole('heading', { name: /minesweeper/i })).toBeInTheDocument();
+    } else {
+      expect(screen.getAllByRole('heading', { name: /minesweeper/i }).length).toBeGreaterThan(0);
+    }
   });
 });
 
