@@ -142,22 +142,69 @@ describe('Minesweeper - gameplay interactions', () => {
     region.focus();
     expect(region).toHaveFocus();
 
-    // Use arrow keys; focus is tracked internally on cells but visual focus is a class on the cell.
-    // We can move and then press Enter / Space to act on the focused cell.
-    await user.keyboard('{ArrowRight}'); // move to (0,1)
-    await user.keyboard('{Enter}'); // reveal focused
-    // find at least one revealed cell on grid after Enter
-    const cells = getAllCells();
-    const revealedCount = cells.filter(c => c.getAttribute('aria-pressed') === 'true').length;
+    // 1) Move focus and reveal at least one cell to ensure keyboard mode is active
+    await user.keyboard('{ArrowRight}');
+    await user.keyboard('{Enter}');
+    const cellsAfterEnter = getAllCells();
+    const revealedCount = cellsAfterEnter.filter(c => c.getAttribute('aria-pressed') === 'true').length;
     expect(revealedCount).toBeGreaterThan(0);
 
-    await user.keyboard(' '); // toggle flag on current focus position
-    // Some cell should become flagged or remain if revealed cell; to avoid coupling, move to another cell and flag
-    await user.keyboard('{ArrowRight}');
-    await user.keyboard(' ');
-    // After flagging via keyboard, at least one covered cell should be flagged
-    const flaggedCount = getAllCells().filter(c => getCellAriaLabel(c) === 'Flagged cell, covered').length;
-    expect(flaggedCount).toBeGreaterThanOrEqual(1);
+    // 2) Now, programmatically move across the grid with arrow keys until we find a covered cell.
+    //    When found, press Space to flag it and assert flagged count increases.
+    const getFlaggedCount = () =>
+      getAllCells().filter(c => getCellAriaLabel(c) === 'Flagged cell, covered').length;
+
+    const wasFlaggedBefore = getFlaggedCount();
+
+    // We'll scan a reasonable number of cells using arrow keys in row-major order:
+    // move right across the top row, then down one, then left across, etc., until we find a covered cell.
+    // To keep the test deterministic and simple, we attempt a bounded number of moves.
+    let foundAndFlagged = false;
+    const maxMoves = 300;
+    let moves = 0;
+
+    // Helper to attempt flag on current focus position
+    const tryFlagCurrent = async () => {
+      // Space to toggle flag; only matters if current is covered
+      await user.keyboard(' ');
+      const after = getFlaggedCount();
+      if (after > wasFlaggedBefore) {
+        return true;
+      }
+      return false;
+    };
+
+    // Try flagging immediately (current focused might be covered if Enter earlier revealed a different cell)
+    if (await tryFlagCurrent()) {
+      foundAndFlagged = true;
+    }
+
+    // If not flagged yet, traverse cells until a covered one is encountered and flagged.
+    // We'll snake through: right until an edge, down, left, down, right, etc.
+    // Keep track of current direction. Start moving right.
+    let direction = 'right';
+    while (!foundAndFlagged && moves < maxMoves) {
+      if (direction === 'right') {
+        await user.keyboard('{ArrowRight}');
+      } else if (direction === 'left') {
+        await user.keyboard('{ArrowLeft}');
+      }
+      moves += 1;
+
+      // Try to flag at each step
+      if (await tryFlagCurrent()) {
+        foundAndFlagged = true;
+        break;
+      }
+
+      // Periodically move down and flip direction to create a snake pattern
+      if (moves % 10 === 0) {
+        await user.keyboard('{ArrowDown}');
+        direction = direction === 'right' ? 'left' : 'right';
+      }
+    }
+
+    expect(foundAndFlagged).toBe(true);
   });
 
   test('Restart button resets the game state and clears overlays', async () => {
